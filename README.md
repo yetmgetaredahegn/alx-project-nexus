@@ -1,6 +1,6 @@
 ---
 
-```markdown
+
 # 🛍️ ALX Project Nexus -  E-Commerce Backend
 
 A **modular monolithic Django backend** built with clean architecture, high cohesion, and low coupling — providing a scalable foundation for real-world e-commerce systems.
@@ -36,7 +36,7 @@ Key Features:
 
 ```
 
-`alx_project_nexus`/
+*alx_project_nexus*/
 ├── core/                          # Common utilities, base models, shared mixins
 ├── accounts/                      # Auth, profiles (Djoser + JWT)
 ├── catalog/                       # Categories, products, reviews, carts
@@ -44,7 +44,7 @@ Key Features:
 ├── payments/                      # Payment handling, Chapa/Stripe gateway integration
 ├── notifications/                 # Email + in-app notifications (Celery workers)
 ├── graphql_api/                   # GraphQL schema for product browsing
-└── `alx_project_nexus`/           # Project settings, URLs, ASGI/Wsgi, Celery config
+└── *alx_project_nexus*/           # Project settings, URLs, ASGI/Wsgi, Celery config
 
 ````
 

@@ -1,0 +1,21 @@
+# Django
+*.sqlite3
+venv
+venv/
+.venv/
+.env/
+*.pyc
+__pycache__/
+*.log
+local_settings.py
+.env
+media/
+static/
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Temporary files
+*.bak
+*.swp

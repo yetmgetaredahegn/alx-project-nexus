@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+from datetime import timedelta
 import os
 import environ
 from pathlib import Path
@@ -38,6 +39,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # apps
+    "accounts.apps.AccountsConfig",
+    "notifications.apps.NotificationsConfig",
+    # third-party
+    "rest_framework",
+    "rest_framework.authtoken",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",    
+    "djoser",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 MIDDLEWARE = [
@@ -122,7 +133,75 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = "accounts.User"
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "no-reply@nexus.com"
+
+CELERY_BROKER_URL = "redis://localhost:6379/1"
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.AllowAny",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 12,
+}
+
+SIMPLE_JWT = {
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+DJOSER = {
+    "LOGIN_FIELD": "email",
+    "USER_CREATE_PASSWORD_RETYPE": True,
+    "SEND_ACTIVATION_EMAIL": False,
+    "SERIALIZERS": {
+        "user_create": "accounts.serializers.UserCreateSerializer",
+        "user": "accounts.serializers.UserSerializer",
+        "current_user": "accounts.serializers.UserSerializer",
+    },
+}
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "ALX Project Nexus API",
+    "DESCRIPTION": "Backend modular-monolith API for ecommerce-style multi-service architecture.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+
+    # To organize endpoints by module automatically
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": True,
+    "SORT_OPERATION_PARAMETERS": True,
+    
+    # JWT support in Swagger UI
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "jwtAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+    },
+    "SECURITY": [
+        {"jwtAuth": []}
+    ],
+}

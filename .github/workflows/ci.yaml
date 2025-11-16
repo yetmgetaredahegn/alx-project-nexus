@@ -26,7 +26,6 @@ jobs:
           --health-retries=5
 
     env:
-      # These mimic your local .env structure
       DB_ENGINE: django.db.backends.postgresql
       DB_NAME: testdb
       DB_USER: testuser
@@ -34,7 +33,7 @@ jobs:
       DB_HOST: localhost
       DB_PORT: 5432
       SECRET_KEY: test-secret-key
-      DEBUG: "0"
+      DEBUG: 0
 
     steps:
       - name: Checkout code
@@ -50,15 +49,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Wait for Postgres
-        run: |
-          until pg_isready -h localhost -p 5432 -U testuser; do
-            echo "Waiting for postgres..."
-            sleep 2
-          done
+      - name: Run Django Migrations (Test DB)
+        run: python manage.py migrate --noinput --settings=alx_project_nexus.settings_test
 
-      - name: Apply migrations
-        run: python manage.py migrate --noinput
+      - name: Run Tests
+        run: pytest --disable-warnings --maxfail=1 --ds=alx_project_nexus.settings_test
 
-      - name: Run tests
-        run: pytest --disable-warnings --maxfail=1

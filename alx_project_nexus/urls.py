@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.conf import settings
 from django.conf.urls.static import static
+# from drf_postman.views import PostmanCollectionView
 
 from django.contrib import admin
 from django.urls import path, include
@@ -50,6 +51,7 @@ urlpatterns = [
     path("api/schema/", SpectacularAPIView.as_view(), name="api-schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="api-schema"), name="api-docs"),
     path("api/redoc/", SpectacularRedocView.as_view(url_name="api-schema"), name="api-redoc"),
+    # path('postman/', PostmanCollectionView.as_view(), name='postman-download'),
 ]
 
 if settings.DEBUG:

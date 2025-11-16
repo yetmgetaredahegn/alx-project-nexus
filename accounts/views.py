@@ -12,7 +12,7 @@ from .schemas import profile_update_schema
 
 
 class ProfileViewSet(viewsets.ModelViewSet):
-    queryset = Profile.objects.all()
+    queryset = Profile.objects.all().order_by("id")
     serializer_class = ProfileSerializer
     parser_classes = [MultiPartParser, FormParser]
 

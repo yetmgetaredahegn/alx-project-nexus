@@ -46,7 +46,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "drf_spectacular",
-    "drf_spectacular_sidecar",    
+    "drf_spectacular_sidecar", 
+    "drf_postman",   
     "djoser",
     "rest_framework_simplejwt.token_blacklist",
 ]

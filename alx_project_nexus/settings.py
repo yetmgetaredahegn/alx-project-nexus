@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # apps
     "accounts.apps.AccountsConfig",
     "notifications.apps.NotificationsConfig",
+    "accounts",
     # third-party
     "rest_framework",
     "rest_framework.authtoken",

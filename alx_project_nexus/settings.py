@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     # apps
     "accounts.apps.AccountsConfig",
     "notifications.apps.NotificationsConfig",
-    "accounts",
+    "catalog",
     # third-party
     "rest_framework",
     "rest_framework.authtoken",
@@ -150,6 +150,18 @@ DEFAULT_FROM_EMAIL = "no-reply@nexus.com"
 
 CELERY_BROKER_URL = "redis://localhost:6379/1"
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Use database 1
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'myproject',  # Prefix for all cache keys
+    }
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -207,3 +219,4 @@ SPECTACULAR_SETTINGS = {
         {"jwtAuth": []}
     ],
 }
+

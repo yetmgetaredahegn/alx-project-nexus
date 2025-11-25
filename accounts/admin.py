@@ -4,14 +4,21 @@ from .models import User, Profile
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
-    list_display = ("id", "email", "username", "is_active", "is_staff")
+    list_display = ("id", "email", "username", "is_active", "is_staff", "is_seller")
+    list_filter = ("is_staff", "is_superuser", "is_active", "is_seller")
     search_fields = ("email", "username")
     ordering = ("email",)
     fieldsets = (
         (None, {"fields": ("email", "username", "password")}),
         ("Personal", {"fields": ("first_name", "last_name")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups")}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "is_seller", "groups")}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
+    add_fieldsets = (
+        (None, {
+            "classes": ("wide",),
+            "fields": ("email", "username", "password1", "password2", "is_seller"),
+        }),
     )
 
 

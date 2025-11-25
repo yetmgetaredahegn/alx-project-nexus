@@ -3,7 +3,7 @@ from rest_framework import permissions
 
 class IsSellerOrAdmin(permissions.BasePermission):
     """
-    Sellers (users in `seller` group) or staff can manage products.
+    Sellers (users with is_seller=True) or staff can manage products.
     """
 
     message = "Only sellers or staff members can modify products."
@@ -15,7 +15,7 @@ class IsSellerOrAdmin(permissions.BasePermission):
         if request.user.is_staff or request.user.is_superuser:
             return True
 
-        return request.user.groups.filter(name="seller").exists()
+        return getattr(request.user, "is_seller", False)
 
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
@@ -24,5 +24,9 @@ class IsSellerOrAdmin(permissions.BasePermission):
         if request.user.is_staff or request.user.is_superuser:
             return True
 
-        return obj.seller_id == request.user.id
+        # Sellers can only modify their own products
+        if getattr(request.user, "is_seller", False):
+            return obj.seller_id == request.user.id
+
+        return False
 

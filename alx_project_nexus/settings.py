@@ -188,6 +188,7 @@ DJOSER = {
     "SEND_ACTIVATION_EMAIL": False,
     "SERIALIZERS": {
         "user_create": "accounts.serializers.UserCreateSerializer",
+        "user_create_password_retype": "accounts.serializers.UserCreatePasswordRetypeSerializer",
         "user": "accounts.serializers.UserSerializer",
         "current_user": "accounts.serializers.UserSerializer",
     },

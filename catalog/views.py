@@ -1,12 +1,23 @@
 # catalog/views.py
-from rest_framework import viewsets, permissions
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .models import Category
-from .serializers import CategorySerializer
+import hashlib
+from datetime import datetime, timezone as dt_timezone
+
 from django.core.cache import cache
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django.db.models import Avg, Max, Value
+from django.db.models.functions import Coalesce
+from django.utils.http import http_date, parse_http_date
+from rest_framework import permissions, status, viewsets
+from rest_framework.response import Response
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter, SearchFilter
+
+from .filters import ProductFilter
+from .models import Category, Product
+from .permissions import IsSellerOrAdmin
+from .serializers import CategorySerializer, ProductSerializer
+
 
 @extend_schema(
     parameters=[
@@ -118,3 +129,235 @@ class CategoryViewSet(viewsets.ModelViewSet):
         instance.is_active = False
         instance.save()
         self._invalidate_category_cache()
+
+
+class ProductViewSet(viewsets.ModelViewSet):
+    """
+    Provides list/create/detail/update/delete endpoints for products with
+    caching, filtering, and conditional requests.
+    """
+
+    serializer_class = ProductSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = ProductFilter
+    search_fields = ["title", "description", "slug"]
+    ordering_fields = ["price", "title", "created_at", "updated_at"]
+    cache_timeout = 300  # seconds
+
+    def get_queryset(self):
+        return (
+            Product.objects.filter(is_active=True)
+            .select_related("category", "seller")
+            .prefetch_related("images")
+            .annotate(
+                rating_avg=Coalesce(
+                    Avg("reviews__rating"),
+                    Value(0.0),
+                )
+            )
+        )
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            return [IsSellerOrAdmin()]
+        return [permissions.AllowAny()]
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        sort_value = self.request.query_params.get("sort")
+        if sort_value:
+            allowed_fields = {"price", "title", "created_at", "updated_at"}
+            normalized = sort_value.lstrip("-")
+            if normalized in allowed_fields:
+                queryset = queryset.order_by(sort_value)
+        return queryset
+
+    def _build_list_cache_key(self, request):
+        return f"products:list:{request.get_full_path()}"
+
+    def _build_detail_cache_key(self, pk):
+        return f"products:detail:{pk}"
+
+    def _build_etag(self, cache_key, last_modified):
+        sig = f"{cache_key}:{last_modified.isoformat() if last_modified else '0'}"
+        return hashlib.md5(sig.encode("utf-8")).hexdigest()
+
+    def _serialize_last_modified(self, value):
+        return value.isoformat() if value else None
+
+    def _parse_last_modified(self, value):
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+
+    def _should_return_not_modified(self, request, etag, last_modified):
+        if_none_match = request.headers.get("If-None-Match")
+        if if_none_match and etag and if_none_match.strip() == etag:
+            return True
+
+        if_modified_since = request.headers.get("If-Modified-Since")
+        if if_modified_since and last_modified:
+            try:
+                since_ts = parse_http_date(if_modified_since)
+                if since_ts is not None:
+                    since_dt = datetime.fromtimestamp(since_ts, tz=dt_timezone.utc)
+                    if last_modified <= since_dt:
+                        return True
+            except (ValueError, OverflowError, OSError):
+                pass
+        return False
+
+    def _attach_cache_headers(self, response, etag, last_modified):
+        if etag:
+            response["ETag"] = etag
+        if last_modified:
+            response["Last-Modified"] = http_date(last_modified.timestamp())
+
+    def _invalidate_product_cache(self, product_id=None):
+        if product_id:
+            cache.delete(self._build_detail_cache_key(product_id))
+
+        pattern = "products:list:*"
+        if hasattr(cache, "delete_pattern"):
+            cache.delete_pattern(pattern)
+        else:
+            # Fallback to clearing all keys when delete_pattern is unavailable
+            cache.clear()
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="page",
+                type=OpenApiTypes.INT,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+            ),
+            OpenApiParameter(
+                name="category",
+                type=OpenApiTypes.INT,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by category ID",
+            ),
+            OpenApiParameter(
+                name="min_price",
+                type=OpenApiTypes.NUMBER,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by minimum price",
+            ),
+            OpenApiParameter(
+                name="max_price",
+                type=OpenApiTypes.NUMBER,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by maximum price",
+            ),
+            OpenApiParameter(
+                name="q",
+                type=OpenApiTypes.STR,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Full-text search in title & description",
+            ),
+            OpenApiParameter(
+                name="seller",
+                type=OpenApiTypes.INT,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Filter by seller ID",
+            ),
+            OpenApiParameter(
+                name="sort",
+                type=OpenApiTypes.STR,
+                required=False,
+                location=OpenApiParameter.QUERY,
+                description="Sort by price, title, created_at, updated_at (prefix with - for descending)",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        cache_key = self._build_list_cache_key(request)
+        cached_entry = cache.get(cache_key)
+
+        if cached_entry:
+            data = cached_entry.get("payload")
+            last_modified = self._parse_last_modified(cached_entry.get("last_modified"))
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+            last_modified = queryset.aggregate(last=Max("updated_at"))["last"]
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(
+                page if page is not None else queryset, many=True
+            )
+            if page is not None:
+                paginated = self.get_paginated_response(serializer.data)
+                data = paginated.data
+            else:
+                data = serializer.data
+            cache.set(
+                cache_key,
+                {
+                    "payload": data,
+                    "last_modified": self._serialize_last_modified(last_modified),
+                },
+                timeout=self.cache_timeout,
+            )
+
+        etag = self._build_etag(cache_key, last_modified)
+        if self._should_return_not_modified(request, etag, last_modified):
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+        else:
+            response = Response(data)
+        self._attach_cache_headers(response, etag, last_modified)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        product = self.get_object()
+        cache_key = self._build_detail_cache_key(product.pk)
+        cached_entry = cache.get(cache_key)
+
+        if cached_entry:
+            data = cached_entry.get("payload")
+            last_modified = self._parse_last_modified(cached_entry.get("last_modified"))
+        else:
+            serializer = self.get_serializer(product)
+            data = serializer.data
+            last_modified = product.updated_at
+            cache.set(
+                cache_key,
+                {
+                    "payload": data,
+                    "last_modified": self._serialize_last_modified(last_modified),
+                },
+                timeout=self.cache_timeout,
+            )
+
+        etag = self._build_etag(cache_key, last_modified or product.updated_at)
+        if self._should_return_not_modified(
+            request, etag, last_modified or product.updated_at
+        ):
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+        else:
+            response = Response(data)
+        self._attach_cache_headers(response, etag, last_modified or product.updated_at)
+        return response
+
+    def perform_create(self, serializer):
+        instance = serializer.save(seller=self.request.user)
+        self._invalidate_product_cache(instance.pk)
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._invalidate_product_cache(instance.pk)
+        return instance
+
+    def perform_destroy(self, instance):
+        instance.is_active = False
+        instance.save(update_fields=["is_active", "updated_at"])
+        self._invalidate_product_cache(instance.pk)

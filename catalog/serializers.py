@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
-from .models import Category
+from .models import Category, Product, ProductImage
 
 
 class CategoryChildSerializer(serializers.ModelSerializer):
@@ -35,3 +35,52 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'slug', 'parent', 'children']
         read_only_fields = ['id', 'slug']
+
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ["id", "image", "alt_text"]
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    images = ProductImageSerializer(many=True, read_only=True)
+    rating_avg = serializers.FloatField(read_only=True)
+    seller = serializers.PrimaryKeyRelatedField(read_only=True)
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(is_active=True)
+    )
+    slug = serializers.SlugField(required=False, allow_blank=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "title",
+            "slug",
+            "description",
+            "price",
+            "stock_quantity",
+            "category",
+            "seller",
+            "images",
+            "rating_avg",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "seller",
+            "slug",
+            "rating_avg",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_stock_quantity(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Stock quantity cannot be negative.")
+        return value

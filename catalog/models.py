@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db import models
-from django.db import models
 from django.utils.text import slugify
 
 class Category(models.Model):
@@ -11,7 +10,7 @@ class Category(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="children"
+        related_name="children",
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -28,21 +27,53 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
-        return self.name
-
 
 class Product(models.Model):
     category = models.ForeignKey(
-        Category, related_name="products", on_delete=models.PROTECT
+        Category,
+        related_name="products",
+        on_delete=models.PROTECT,
     )
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(unique=True)
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="products",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock_quantity = models.PositiveIntegerField(default=0)  # ✅ store directly
+    stock_quantity = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    search_vector = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["slug"]),
+            models.Index(fields=["is_active", "updated_at"]),
+            models.Index(fields=["seller"]),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.title)
+            slug = base_slug
+            suffix = 1
+            while Product.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base_slug}-{suffix}"
+                suffix += 1
+            self.slug = slug
+
+        self.search_vector = f"{self.title} {self.description}".strip()
+        super().save(*args, **kwargs)
 
 class ProductImage(models.Model):
     product = models.ForeignKey(
@@ -52,7 +83,7 @@ class ProductImage(models.Model):
     alt_text = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return f"Image for {self.product.name}"
+        return f"Image for {self.product.title}"
 
 class Review(models.Model):
     product = models.ForeignKey(
@@ -69,4 +100,4 @@ class Review(models.Model):
         unique_together = ("product", "user")  # user can review once
 
     def __str__(self):
-        return f"{self.product.name} - {self.rating}★"
+        return f"{self.product.title} - {self.rating}★"

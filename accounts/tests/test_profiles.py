@@ -65,6 +65,19 @@ class TestMyProfile:
         assert response.status_code == 200
         assert response.data["bio"] == "New bio"
 
+    def test_put_update_profile(self, client, user):
+        client.force_authenticate(user)
+        url = reverse("profile-me")
+
+        data = {
+            "phone": "0911002200",
+            "bio": "Full update bio",
+        }
+
+        response = client.put(url, data, format="json")
+        assert response.status_code == 200
+        assert response.data["bio"] == "Full update bio"
+
 
 @pytest.mark.django_db
 class TestProfilePermissions:

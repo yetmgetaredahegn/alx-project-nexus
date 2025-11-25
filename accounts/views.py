@@ -7,14 +7,16 @@ from drf_yasg.utils import swagger_auto_schema
 from .models import Profile
 from .serializers import ProfileSerializer
 from .permissions import IsOwnerOrAdmin
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .schemas import profile_update_schema
 
 
 class ProfileViewSet(viewsets.ModelViewSet):
     queryset = Profile.objects.all().order_by("id")
     serializer_class = ProfileSerializer
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    # Profiles are auto-created via signals, so POST /profiles/ is disabled
+    http_method_names = ["get", "patch", "put", "delete", "head", "options"]
 
     # 🔒 Default → must be authenticated, and owner/admin for detail routes
     permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
@@ -51,10 +53,10 @@ class ProfileViewSet(viewsets.ModelViewSet):
     )
     @swagger_auto_schema(
         operation_description="Update your profile (supports avatar image upload).",
-        methods=["patch"],
+        methods=["patch", "put"],
         request_body=profile_update_schema,
     )
-    @action(detail=False, methods=["get", "patch"], url_path="me")
+    @action(detail=False, methods=["get", "patch", "put"], url_path="me")
     def me(self, request):
         profile = request.user.profile
 
@@ -62,9 +64,11 @@ class ProfileViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(profile)
             return Response(serializer.data)
 
-        if request.method == "PATCH":
+        if request.method in ("PATCH", "PUT"):
             serializer = self.get_serializer(
-                profile, data=request.data, partial=True
+                profile,
+                data=request.data,
+                partial=request.method == "PATCH",
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()

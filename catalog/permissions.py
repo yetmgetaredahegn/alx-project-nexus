@@ -30,3 +30,17 @@ class IsSellerOrAdmin(permissions.BasePermission):
 
         return False
 
+
+class IsReviewOwnerOrAdmin(permissions.BasePermission):
+    """
+    Only review owner or admin can update/delete.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        if request.user.is_staff or request.user.is_superuser:
+            return True
+
+        return obj.user_id == request.user.id

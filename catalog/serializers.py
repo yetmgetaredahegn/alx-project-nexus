@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
-from .models import Category, Product, ProductImage
+from .models import Category, Product, ProductImage, Review
 
 
 class CategoryChildSerializer(serializers.ModelSerializer):
@@ -41,7 +41,8 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ["id", "image", "alt_text"]
+        fields = ["id", "image", "uploaded_at"]
+
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -84,3 +85,23 @@ class ProductSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Stock quantity cannot be negative.")
         return value
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Review
+        fields = [
+            "id",
+            "user",
+            "rating",
+            "comment",
+            "created_at",
+        ]
+        read_only_fields = ["id", "user", "created_at"]
+
+    def validate_rating(self, value):
+        if not 1 <= value <= 5:
+            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        return value
+

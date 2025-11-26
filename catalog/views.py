@@ -2,6 +2,11 @@
 import hashlib
 from datetime import datetime, timezone as dt_timezone
 
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.shortcuts import get_object_or_404
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.decorators import action
 from django.core.cache import cache
 from django.db.models import Avg, Max, Value
 from django.db.models.functions import Coalesce
@@ -13,10 +18,12 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 
-from .filters import ProductFilter
-from .models import Category, Product
-from .permissions import IsSellerOrAdmin
-from .serializers import CategorySerializer, ProductSerializer
+from catalog.schemas import product_image_upload_schema
+
+from .filters import ProductFilter, ProductImageFilter
+from .models import Category, Product, ProductImage, Review
+from .permissions import IsReviewOwnerOrAdmin, IsSellerOrAdmin
+from .serializers import CategorySerializer, ProductSerializer, ProductImageSerializer, ReviewSerializer
 
 
 @extend_schema(
@@ -361,3 +368,86 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
         self._invalidate_product_cache(instance.pk)
+
+    @extend_schema(
+        description="Upload an image for the specified product (seller-only).",
+        methods=["post"],
+        request=product_image_upload_schema,
+        responses={201: ProductImageSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="upload-image",
+        permission_classes=[IsSellerOrAdmin],
+    )
+    def upload_image(self, request, pk=None):
+        """Upload a product image (seller-only)."""
+        product = self.get_object()
+
+        # Ensure sellers upload only to their own products
+        if not request.user.is_staff and product.seller_id != request.user.id:
+            return Response(
+                {"detail": "You can only upload images for your own products."},
+                status=403
+            )
+
+        serializer = ProductImageSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(product=product)
+
+            # Invalidate product cache
+            self._invalidate_product_cache(product.pk)
+
+            return Response(serializer.data, status=201)
+
+        return Response(serializer.errors, status=400)
+
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsReviewOwnerOrAdmin]
+
+    def get_queryset(self):
+        product_id = self.kwargs["product_id"]
+        return Review.objects.filter(product_id=product_id).order_by("-created_at")
+
+    def perform_create(self, serializer):
+        product_id = self.kwargs["product_id"]
+        product = get_object_or_404(Product, pk=product_id)
+
+        # Ensure user can only review once
+        if Review.objects.filter(product=product, user=self.request.user).exists():
+            raise ValidationError("You have already reviewed this product.")
+
+        review = serializer.save(
+            user=self.request.user,
+            product=product,
+        )
+
+        # Update product statistics
+        self._update_product_rating(product)
+
+        return review
+
+    def perform_update(self, serializer):
+        review = serializer.save()
+        self._update_product_rating(review.product)
+
+    def perform_destroy(self, instance):
+        product = instance.product
+        instance.delete()
+        self._update_product_rating(product)
+
+    def _update_product_rating(self, product):
+        """
+        Recalculate rating_avg and number of reviews.
+        """
+        stats = product.reviews.aggregate(
+            avg=models.Avg("rating"),
+            count=models.Count("id")
+        )
+        product.rating_avg = stats["avg"] or 0
+        product.num_reviews = stats["count"]
+        product.save(update_fields=["rating_avg", "num_reviews"])

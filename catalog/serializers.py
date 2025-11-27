@@ -48,6 +48,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     rating_avg = serializers.FloatField(read_only=True)
+    review_count = serializers.IntegerField(read_only=True)
     seller = serializers.PrimaryKeyRelatedField(read_only=True)
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.filter(is_active=True)
@@ -67,6 +68,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "seller",
             "images",
             "rating_avg",
+            "review_count",
             "is_active",
             "created_at",
             "updated_at",
@@ -76,6 +78,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "seller",
             "slug",
             "rating_avg",
+            "review_count",
             "is_active",
             "created_at",
             "updated_at",
@@ -101,7 +104,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "user", "created_at"]
 
     def validate_rating(self, value):
-        if not 1 <= value <= 5:
-            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        if not 1 <= value <= 10:
+            raise serializers.ValidationError("Rating must be between 1 and 10.")
         return value
 

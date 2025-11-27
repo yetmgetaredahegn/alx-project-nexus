@@ -2,28 +2,34 @@
 import hashlib
 from datetime import datetime, timezone as dt_timezone
 
-from django.core.exceptions import ValidationError
-from django.db import models
-from django.shortcuts import get_object_or_404
-from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import action
 from django.core.cache import cache
-from django.db.models import Avg, Max, Value
+from django.db import models
+from django.db.models import Avg, Count, Max, Value
 from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.http import http_date, parse_http_date
-from rest_framework import permissions, status, viewsets
-from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.response import Response
 
+from catalog.cache_utils import invalidate_product_cache
 from catalog.schemas import product_image_upload_schema
 
-from .filters import ProductFilter, ProductImageFilter
+from .filters import ProductFilter
 from .models import Category, Product, ProductImage, Review
 from .permissions import IsReviewOwnerOrAdmin, IsSellerOrAdmin
-from .serializers import CategorySerializer, ProductSerializer, ProductImageSerializer, ReviewSerializer
+from .serializers import (
+    CategorySerializer,
+    ProductImageSerializer,
+    ProductSerializer,
+    ReviewSerializer,
+)
 
 
 @extend_schema(
@@ -160,7 +166,11 @@ class ProductViewSet(viewsets.ModelViewSet):
                 rating_avg=Coalesce(
                     Avg("reviews__rating"),
                     Value(0.0),
-                )
+                ),
+                review_count=Coalesce(
+                    Count("reviews"),
+                    Value(0, output_field=models.IntegerField()),
+                ),
             )
         )
 
@@ -222,17 +232,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             response["ETag"] = etag
         if last_modified:
             response["Last-Modified"] = http_date(last_modified.timestamp())
-
-    def _invalidate_product_cache(self, product_id=None):
-        if product_id:
-            cache.delete(self._build_detail_cache_key(product_id))
-
-        pattern = "products:list:*"
-        if hasattr(cache, "delete_pattern"):
-            cache.delete_pattern(pattern)
-        else:
-            # Fallback to clearing all keys when delete_pattern is unavailable
-            cache.clear()
 
     @extend_schema(
         parameters=[
@@ -356,18 +355,18 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save(seller=self.request.user)
-        self._invalidate_product_cache(instance.pk)
+        invalidate_product_cache(instance.pk)
         return instance
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        self._invalidate_product_cache(instance.pk)
+        invalidate_product_cache(instance.pk)
         return instance
 
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
-        self._invalidate_product_cache(instance.pk)
+        invalidate_product_cache(instance.pk)
 
     @extend_schema(
         description="Upload an image for the specified product (seller-only).",
@@ -398,23 +397,27 @@ class ProductViewSet(viewsets.ModelViewSet):
             serializer.save(product=product)
 
             # Invalidate product cache
-            self._invalidate_product_cache(product.pk)
+            invalidate_product_cache(product.pk)
 
             return Response(serializer.data, status=201)
 
         return Response(serializer.errors, status=400)
 
-
+@extend_schema(
+    description="Manage reviews for a product.",
+    methods=["get", "post", "put", "delete"],
+    responses={200: ReviewSerializer(many=True), 201: ReviewSerializer, 400: "Error"},
+)
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsReviewOwnerOrAdmin]
 
     def get_queryset(self):
-        product_id = self.kwargs["product_id"]
+        product_id = self.kwargs["product_pk"]
         return Review.objects.filter(product_id=product_id).order_by("-created_at")
 
     def perform_create(self, serializer):
-        product_id = self.kwargs["product_id"]
+        product_id = self.kwargs["product_pk"]
         product = get_object_or_404(Product, pk=product_id)
 
         # Ensure user can only review once
@@ -427,27 +430,22 @@ class ReviewViewSet(viewsets.ModelViewSet):
         )
 
         # Update product statistics
-        self._update_product_rating(product)
+        self._handle_product_side_effects(product)
 
         return review
 
     def perform_update(self, serializer):
         review = serializer.save()
-        self._update_product_rating(review.product)
+        self._handle_product_side_effects(review.product)
 
     def perform_destroy(self, instance):
         product = instance.product
         instance.delete()
-        self._update_product_rating(product)
+        self._handle_product_side_effects(product)
 
-    def _update_product_rating(self, product):
+    def _handle_product_side_effects(self, product):
         """
-        Recalculate rating_avg and number of reviews.
+        Ensure product caches stay in sync whenever related reviews change.
         """
-        stats = product.reviews.aggregate(
-            avg=models.Avg("rating"),
-            count=models.Count("id")
-        )
-        product.rating_avg = stats["avg"] or 0
-        product.num_reviews = stats["count"]
-        product.save(update_fields=["rating_avg", "num_reviews"])
+        Product.objects.filter(pk=product.pk).update(updated_at=timezone.now())
+        invalidate_product_cache(product.pk)

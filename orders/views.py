@@ -44,9 +44,10 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # list -> only current user's orders (admins can see all if they use admin endpoints)
-        if self.request.user.is_staff:
-            return super().get_queryset()
-        return Order.objects.filter(user=self.request.user).prefetch_related("items")
+        queryset = super().get_queryset()
+        if self.action == "list" and not self.request.user.is_staff:
+            queryset = queryset.filter(user=self.request.user)
+        return queryset
 
     @extend_schema(summary="Create order from current user's cart",
                    request=OrderCreateSerializer,
@@ -91,7 +92,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 product = ci.product
                 unit_price = product.price
                 quantity = ci.quantity
-                line_total = (unit_price * quantity).quantize(unit_price)
+                line_total = (unit_price * quantity).quantize(Decimal('0.01'))
 
                 OrderItem.objects.create(
                     order=order,

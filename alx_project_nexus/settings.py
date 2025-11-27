@@ -43,6 +43,9 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "notifications.apps.NotificationsConfig",
     "catalog",
+    'cart',
+    'orders',
+    'payments',
     # third-party
     "rest_framework",
     "rest_framework.authtoken",

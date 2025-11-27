@@ -54,7 +54,7 @@ class OrderItem(models.Model):
 
     def save(self, *args, **kwargs):
         # ensure line_total consistent
-        self.line_total = (self.unit_price * self.quantity).quantize(self.unit_price.as_tuple()._asdict().get('exponent', 2))
+        self.line_total = (self.unit_price * self.quantity).quantize(Decimal('0.01'))
         super().save(*args, **kwargs)
 
     def __str__(self):

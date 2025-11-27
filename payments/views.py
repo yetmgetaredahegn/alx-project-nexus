@@ -60,8 +60,18 @@ def initiate_payment(request):
     except Order.DoesNotExist:
         return Response({"detail": "Order not found"}, status=404)
 
-    if hasattr(order, "payment") and order.payment.status == "completed":
-        return Response({"detail": "Order already paid"}, status=400)
+    # Check if payment already exists
+    if hasattr(order, "payment"):
+        if order.payment.status == "completed":
+            return Response({"detail": "Order already paid"}, status=400)
+        # If payment exists but is pending or failed, we can reuse it or create new one
+        # For simplicity, we'll return the existing payment URL if pending
+        if order.payment.status == "pending":
+            return Response({
+                "detail": "Payment already initiated",
+                "payment_id": str(order.payment.id),
+                "tx_ref": order.payment.tx_ref,
+            }, status=400)
 
     tx_ref = str(uuid.uuid4())
 
@@ -149,8 +159,8 @@ def chapa_webhook(request):
     if chapa_status == "success":
         changed = payment.mark_completed()
         if changed:
-            payment.order.status = "paid"
-            payment.order.save()
+            payment.order.payment_status = Order.PAYMENT_PAID
+            payment.order.save(update_fields=["payment_status"])
 
             send_payment_confirmation_email.delay(
                 email,
@@ -159,7 +169,10 @@ def chapa_webhook(request):
             )
 
     elif chapa_status == "failed":
-        payment.mark_failed()
+        changed = payment.mark_failed()
+        if changed:
+            payment.order.payment_status = Order.PAYMENT_FAILED
+            payment.order.save(update_fields=["payment_status"])
 
     return Response({"detail": "Webhook processed"}, status=200)
 

@@ -224,3 +224,35 @@ SPECTACULAR_SETTINGS = {
     ],
 }
 
+# -------------------------------
+# CHAPA PAYMENT CONFIG
+# -------------------------------
+CHAPA_SECRET_KEY = os.getenv("CHAPA_SECRET_KEY")
+CHAPA_PUBLIC_KEY = os.getenv("CHAPA_PUBLIC_KEY")
+CHAPA_BASE_URL = os.getenv("CHAPA_BASE_URL", "https://api.chapa.co/v1")
+
+# -------------------------------
+# PAYMENT CALLBACK URLS
+# -------------------------------
+PAYMENT_CALLBACK_URL = os.getenv(
+    "PAYMENT_CALLBACK_URL", 
+    "https://yourdomain.com/api/payments/webhook/"
+)
+
+PAYMENT_RETURN_URL = os.getenv(
+    "PAYMENT_RETURN_URL",
+    "https://yourdomain.com/payment-success/"
+)
+
+# -------------------------------
+# EMAIL CONFIG
+# -------------------------------
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@nexus.com")
+
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"

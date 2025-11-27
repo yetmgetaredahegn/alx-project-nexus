@@ -21,6 +21,7 @@ from .serializers import (
 
 
 
+@extend_schema(tags=["Orders"])
 class OrderViewSet(viewsets.ModelViewSet):
     """
     Orders endpoints:
@@ -49,9 +50,13 @@ class OrderViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user=self.request.user)
         return queryset
 
-    @extend_schema(summary="Create order from current user's cart",
-                   request=OrderCreateSerializer,
-                   responses={201: OrderSerializer})
+    @extend_schema(
+        summary="Create order from current user's cart",
+        description="Creates an order from the authenticated user's cart. Validates stock availability, creates order items, decrements product stock, and clears the cart. Returns the created order with payment status 'pending'.",
+        request=OrderCreateSerializer,
+        responses={201: OrderSerializer, 400: "Bad request (empty cart, insufficient stock, inactive product)", 401: "Unauthorized"},
+        tags=["Orders"],
+    )
     def create(self, request, *args, **kwargs):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -123,9 +128,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         out = OrderSerializer(order, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(summary="Update order status (admin only)",
-                   request=OrderStatusUpdateSerializer,
-                   responses={200: OrderSerializer})
+    @extend_schema(
+        summary="Update order status (admin only)",
+        description="Update the status of an order. Only admin users can update order status. Status changes may trigger notifications.",
+        request=OrderStatusUpdateSerializer,
+        responses={200: OrderSerializer, 400: "Bad request", 403: "Forbidden (admin only)", 404: "Not found"},
+        tags=["Orders"],
+    )
     def partial_update(self, request, *args, **kwargs):
         # Only admin allowed (get_permissions covers it)
         order = self.get_object()
@@ -135,9 +144,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         # TODO: enqueue notification email/email task on status change (Celery)
         return Response(OrderSerializer(order).data)
 
-    @extend_schema(summary="Request order cancellation",
-                   request=OrderCancellationSerializer,
-                   responses={200: OrderCancellationSerializer})
+    @extend_schema(
+        summary="Request order cancellation",
+        description="Request cancellation of an order. Only the order owner or admin can request cancellation. Returns a cancellation request record.",
+        request=OrderCancellationSerializer,
+        responses={200: OrderCancellationSerializer, 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+        tags=["Orders"],
+    )
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
         order = self.get_object()

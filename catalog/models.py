@@ -46,6 +46,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     stock_quantity = models.PositiveIntegerField(default=0)
+    images = models.JSONField(default=list, blank=True, help_text="List of image file paths/URLs")
     is_active = models.BooleanField(default=True)
     search_vector = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -75,13 +76,6 @@ class Product(models.Model):
         self.search_vector = f"{self.title} {self.description}".strip()
         super().save(*args, **kwargs)
 
-class ProductImage(models.Model):
-    product = models.ForeignKey(
-        Product, related_name="images", on_delete=models.CASCADE
-    )
-    image = models.ImageField(upload_to="products/")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    
 
 class Review(models.Model):
     product = models.ForeignKey(

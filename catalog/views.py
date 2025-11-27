@@ -19,20 +19,20 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from catalog.cache_utils import invalidate_product_cache
-from catalog.schemas import product_image_upload_schema
 
 from .filters import ProductFilter
-from .models import Category, Product, ProductImage, Review
+from .models import Category, Product, Review
 from .permissions import IsReviewOwnerOrAdmin, IsSellerOrAdmin
 from .serializers import (
     CategorySerializer,
-    ProductImageSerializer,
     ProductSerializer,
     ReviewSerializer,
 )
 
 
 @extend_schema(
+    summary="Category management",
+    description="Endpoints for managing product categories. Categories support hierarchical structure with parent-child relationships.",
     parameters=[
         OpenApiParameter(
             name="include_children",
@@ -41,7 +41,8 @@ from .serializers import (
             required=False,
             description="Set to 1 to include children categories in the response. Default is 0 (no children)."
         )
-    ]
+    ],
+    tags=["Catalog"],
 )
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.filter(is_active=True)
@@ -161,7 +162,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         return (
             Product.objects.filter(is_active=True)
             .select_related("category", "seller")
-            .prefetch_related("images")
             .annotate(
                 rating_avg=Coalesce(
                     Avg("reviews__rating"),
@@ -234,6 +234,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             response["Last-Modified"] = http_date(last_modified.timestamp())
 
     @extend_schema(
+        summary="List products",
+        description="Returns a paginated list of active products with filtering, searching, and sorting capabilities. Supports conditional requests with ETag and Last-Modified headers.",
         parameters=[
             OpenApiParameter(
                 name="page",
@@ -284,7 +286,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 location=OpenApiParameter.QUERY,
                 description="Sort by price, title, created_at, updated_at (prefix with - for descending)",
             ),
-        ]
+        ],
+        tags=["Catalog"],
     )
     def list(self, request, *args, **kwargs):
         cache_key = self._build_list_cache_key(request)
@@ -353,60 +356,65 @@ class ProductViewSet(viewsets.ModelViewSet):
         self._attach_cache_headers(response, etag, last_modified or product.updated_at)
         return response
 
+    @extend_schema(
+        summary="Create a product",
+        description="Create a new product. Only sellers and admins can create products. Supports image uploads via multipart/form-data. Images can be sent as a list of image files.",
+        request=ProductSerializer,
+        responses={201: ProductSerializer, 400: "Bad request", 401: "Unauthorized", 403: "Forbidden"},
+        tags=["Catalog"],
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         instance = serializer.save(seller=self.request.user)
         invalidate_product_cache(instance.pk)
         return instance
+
+    @extend_schema(
+        summary="Update a product",
+        description="Update a product. Only the product seller or admin can update. Supports image uploads via multipart/form-data. Send empty images list in JSON format to clear all images.",
+        request=ProductSerializer,
+        responses={200: ProductSerializer, 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+        tags=["Catalog"],
+    )
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Partially update a product",
+        description="Partially update a product. Only the product seller or admin can update. Supports image uploads via multipart/form-data. Send empty images list in JSON format to clear all images.",
+        request=ProductSerializer,
+        responses={200: ProductSerializer, 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+        tags=["Catalog"],
+    )
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         instance = serializer.save()
         invalidate_product_cache(instance.pk)
         return instance
 
+    @extend_schema(
+        summary="Delete a product (soft delete)",
+        description="Soft delete a product by setting is_active to False. Only the product seller or admin can delete.",
+        responses={204: "Product deleted", 403: "Forbidden", 404: "Not found"},
+        tags=["Catalog"],
+    )
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save(update_fields=["is_active", "updated_at"])
         invalidate_product_cache(instance.pk)
 
-    @extend_schema(
-        description="Upload an image for the specified product (seller-only).",
-        methods=["post"],
-        request=product_image_upload_schema,
-        responses={201: ProductImageSerializer},
-    )
-    @action(
-        detail=True,
-        methods=["post"],
-        url_path="upload-image",
-        permission_classes=[IsSellerOrAdmin],
-    )
-    def upload_image(self, request, pk=None):
-        """Upload a product image (seller-only)."""
-        product = self.get_object()
-
-        # Ensure sellers upload only to their own products
-        if not request.user.is_staff and product.seller_id != request.user.id:
-            return Response(
-                {"detail": "You can only upload images for your own products."},
-                status=403
-            )
-
-        serializer = ProductImageSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save(product=product)
-
-            # Invalidate product cache
-            invalidate_product_cache(product.pk)
-
-            return Response(serializer.data, status=201)
-
-        return Response(serializer.errors, status=400)
 
 @extend_schema(
-    description="Manage reviews for a product.",
-    methods=["get", "post", "put", "delete"],
-    responses={200: ReviewSerializer(many=True), 201: ReviewSerializer, 400: "Error"},
+    summary="Manage product reviews",
+    description="Endpoints for managing reviews on products. Users can create one review per product.",
+    tags=["Catalog"],
 )
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer

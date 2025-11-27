@@ -6,6 +6,8 @@ from .views import (
     PaymentDetailView,
 )
 
+app_name = "payments"
+
 urlpatterns = [
     path("initiate/", initiate_payment, name="payment-initiate"),
     path("webhook/", chapa_webhook, name="payment-webhook"),

@@ -42,6 +42,10 @@ INSTALLED_APPS = [
     # apps
     "accounts.apps.AccountsConfig",
     "notifications.apps.NotificationsConfig",
+    "catalog",
+    'cart',
+    'orders',
+    'payments',
     # third-party
     "rest_framework",
     "rest_framework.authtoken",
@@ -149,6 +153,18 @@ DEFAULT_FROM_EMAIL = "no-reply@nexus.com"
 
 CELERY_BROKER_URL = "redis://localhost:6379/1"
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Use database 1
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'myproject',  # Prefix for all cache keys
+    }
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -175,6 +191,7 @@ DJOSER = {
     "SEND_ACTIVATION_EMAIL": False,
     "SERIALIZERS": {
         "user_create": "accounts.serializers.UserCreateSerializer",
+        "user_create_password_retype": "accounts.serializers.UserCreatePasswordRetypeSerializer",
         "user": "accounts.serializers.UserSerializer",
         "current_user": "accounts.serializers.UserSerializer",
     },
@@ -206,3 +223,36 @@ SPECTACULAR_SETTINGS = {
         {"jwtAuth": []}
     ],
 }
+
+# -------------------------------
+# CHAPA PAYMENT CONFIG
+# -------------------------------
+CHAPA_SECRET_KEY = os.getenv("CHAPA_SECRET_KEY")
+CHAPA_PUBLIC_KEY = os.getenv("CHAPA_PUBLIC_KEY")
+CHAPA_BASE_URL = os.getenv("CHAPA_BASE_URL", "https://api.chapa.co/v1")
+
+# -------------------------------
+# PAYMENT CALLBACK URLS
+# -------------------------------
+PAYMENT_CALLBACK_URL = os.getenv(
+    "PAYMENT_CALLBACK_URL", 
+    "https://yourdomain.com/api/payments/webhook/"
+)
+
+PAYMENT_RETURN_URL = os.getenv(
+    "PAYMENT_RETURN_URL",
+    "https://yourdomain.com/payment-success/"
+)
+
+# -------------------------------
+# EMAIL CONFIG
+# -------------------------------
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@nexus.com")
+
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"

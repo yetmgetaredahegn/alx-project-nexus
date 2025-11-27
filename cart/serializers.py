@@ -1,26 +1,37 @@
-from decimal import Decimal
-from rest_framework import serializers
 from django.db import transaction
-from django.shortcuts import get_object_or_404
+from rest_framework import serializers
 
 from catalog.models import Product
 from .models import Cart, CartItem
 
 
+class ProductSummarySerializer(serializers.ModelSerializer):
+    price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ["id", "title", "price"]
+
+    def get_price(self, obj):
+        return str(obj.price)
+
+
 class CartItemSerializer(serializers.ModelSerializer):
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.filter(is_active=True))
-    product_detail = serializers.SerializerMethodField(read_only=True)
+    product = ProductSummarySerializer(read_only=True)
     line_total = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CartItem
-        fields = ["id", "product", "product_detail", "quantity", "unit_price", "line_total", "created_at", "updated_at"]
-        read_only_fields = ["unit_price", "line_total", "created_at", "updated_at", "product_detail"]
-
-    def get_product_detail(self, obj):
-        # Minimal product summary; expand if you need extra fields
-        p = obj.product
-        return {"id": p.id, "title": getattr(p, "title", None), "price": str(p.price)}
+        fields = [
+            "id",
+            "product",
+            "quantity",
+            "unit_price",
+            "line_total",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["unit_price", "line_total", "created_at", "updated_at"]
 
     def get_line_total(self, obj):
         return str(obj.line_total)

@@ -68,6 +68,7 @@ locust==2.31.0
 MarkupSafe==3.0.3
 matplotlib-inline==0.2.1
 mccabe==0.7.0
+model-bakery==1.20.5
 msgpack==1.1.2
 mypy_extensions==1.1.0
 oauthlib==3.3.1

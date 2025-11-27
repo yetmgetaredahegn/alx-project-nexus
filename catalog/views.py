@@ -60,7 +60,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         context['include_children'] = include_children
         return context
 
-    def _invalidate_category_cache(self):
+    def _invalidate_category_cache(self, category_id=None):
         """Invalidate all category-related cache keys"""
         # Delete all keys matching the pattern using django-redis
         try:
@@ -97,6 +97,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
             # This ensures at least the most common cache keys are cleared
             for include_children in ['0', '1']:
                 cache.delete(f"categories_list_{include_children}")
+                # Also delete individual category cache keys if category_id is provided
+                if category_id is not None:
+                    cache.delete(f"category_{category_id}_{include_children}")
 
     def list(self, request, *args, **kwargs):
         cache_key = f"categories_list_{request.query_params.get('include_children', '0')}"
@@ -122,7 +125,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        self._invalidate_category_cache()
+        self._invalidate_category_cache(category_id=instance.id)
         return instance
 
     def retrieve(self, request, *args, **kwargs):
@@ -142,7 +145,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save()
-        self._invalidate_category_cache()
+        self._invalidate_category_cache(category_id=instance.id)
 
 
 class ProductViewSet(viewsets.ModelViewSet):

@@ -8,6 +8,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U testuser -d testdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: testdb
+      DB_USER: testuser
+      DB_PASSWORD: testpass
+      DB_HOST: localhost
+      DB_PORT: 5432
+      SECRET_KEY: test-secret-key
+      DEBUG: 0
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,6 +49,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Run Django Migrations (Test DB)
+        run: python manage.py migrate --noinput --settings=alx_project_nexus.settings_test
 
       - name: Run Django Tests
         run: pytest --disable-warnings --maxfail=1 --ds=alx_project_nexus.settings_test

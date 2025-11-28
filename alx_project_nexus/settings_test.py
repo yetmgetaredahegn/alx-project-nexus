@@ -1,4 +1,9 @@
 from .settings import *
+import os
+
+# Override SECRET_KEY for tests if not set in environment
+if not os.environ.get("SECRET_KEY"):
+    SECRET_KEY = "test-secret-key-for-testing-only"
 
 DATABASES = {
     "default": {

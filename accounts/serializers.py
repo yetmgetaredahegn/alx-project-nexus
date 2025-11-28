@@ -36,8 +36,8 @@ class UserCreatePasswordRetypeSerializer(DjoserUserCreatePasswordRetypeSerialize
 
     class Meta(DjoserUserCreatePasswordRetypeSerializer.Meta):
         model = User
-        # Include re_password which is required by the parent serializer
-        fields = ("id", "email", "username", "password", "re_password", "is_seller")
+        # Note: re_password is automatically added by the parent class, don't include it in fields
+        fields = ("id", "email", "username", "password", "is_seller")
         read_only_fields = ("id",)
         extra_kwargs = {"password": {"write_only": True}}
 

@@ -40,6 +40,13 @@ class UserCreatePasswordRetypeSerializer(DjoserUserCreatePasswordRetypeSerialize
         read_only_fields = ("id",)
         extra_kwargs = {"password": {"write_only": True}}
 
+    def create(self, validated_data):
+        is_seller = validated_data.pop("is_seller", False)
+        user = super().create(validated_data)
+        user.is_seller = is_seller
+        user.save(update_fields=["is_seller"])
+        return user
+
 
 class UserSerializer(DjoserUserSerializer):
     profile = ProfileSerializer(read_only=True)

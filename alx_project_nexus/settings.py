@@ -9,6 +9,8 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+from urllib.parse import urlparse
+import dj_database_url
 
 from datetime import timedelta
 import os
@@ -29,6 +31,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 
+ALLOWED_HOSTS = ["*", ".onrender.com"]
 
 # Application definition
 
@@ -42,6 +45,10 @@ INSTALLED_APPS = [
     # apps
     "accounts.apps.AccountsConfig",
     "notifications.apps.NotificationsConfig",
+    "catalog",
+    'cart',
+    'orders',
+    'payments',
     # third-party
     "rest_framework",
     "rest_framework.authtoken",
@@ -85,17 +92,27 @@ WSGI_APPLICATION = 'alx_project_nexus.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-DATABASES = {
-    'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': env('DB_NAME'),
-            'USER': env('DB_USER'),
-            'PASSWORD': env('DB_PASSWORD'),
-            'HOST': env('DB_HOST'),
-            'PORT': env('DB_PORT'),
+if DATABASE_URL:
+    # Render/Neon Production
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    # Local development
+    DATABASES = {
+        'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': env('DB_NAME'),
+                'USER': env('DB_USER'),
+                'PASSWORD': env('DB_PASSWORD'),
+                'HOST': env('DB_HOST'),
+                'PORT': env('DB_PORT'),
+        }
+    }
+
+
 
 
 # Password validation
@@ -131,11 +148,12 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
-
-STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_URL = "/static/"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -144,11 +162,36 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = "accounts.User"
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "no-reply@nexus.com"
 
-CELERY_BROKER_URL = "redis://localhost:6379/1"
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+
+# CELERY_BROKER_URL = "redis://localhost:6379/1"
+# CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+
+REDIS_URL = os.environ.get("REDIS_URL")
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SSLCERTREQS": None,   # Required for Upstash TLS
+            }
+        }
+    }
+else:
+    # fallback: local memory cache (for development)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
+CELERY_BROKER_URL = os.environ.get("REDIS_URL")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
+
+
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -175,6 +218,7 @@ DJOSER = {
     "SEND_ACTIVATION_EMAIL": False,
     "SERIALIZERS": {
         "user_create": "accounts.serializers.UserCreateSerializer",
+        "user_create_password_retype": "accounts.serializers.UserCreatePasswordRetypeSerializer",
         "user": "accounts.serializers.UserSerializer",
         "current_user": "accounts.serializers.UserSerializer",
     },
@@ -206,3 +250,36 @@ SPECTACULAR_SETTINGS = {
         {"jwtAuth": []}
     ],
 }
+
+# -------------------------------
+# CHAPA PAYMENT CONFIG
+# -------------------------------
+CHAPA_SECRET_KEY = os.getenv("CHAPA_SECRET_KEY")
+CHAPA_PUBLIC_KEY = os.getenv("CHAPA_PUBLIC_KEY")
+CHAPA_BASE_URL = os.getenv("CHAPA_BASE_URL", "https://api.chapa.co/v1")
+
+# -------------------------------
+# PAYMENT CALLBACK URLS
+# -------------------------------
+PAYMENT_CALLBACK_URL = os.getenv(
+    "PAYMENT_CALLBACK_URL", 
+    "https://yourdomain.com/api/payments/webhook/"
+)
+
+PAYMENT_RETURN_URL = os.getenv(
+    "PAYMENT_RETURN_URL",
+    "https://yourdomain.com/payment-success/"
+)
+
+# -------------------------------
+# EMAIL CONFIG
+# -------------------------------
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@nexus.com")
+
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"

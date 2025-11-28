@@ -10,6 +10,7 @@ class User(AbstractUser):
     """
 
     email = models.EmailField(unique=True)
+    is_seller = models.BooleanField(default=False)
 
     REQUIRED_FIELDS = ["username"]
     USERNAME_FIELD = "email"  # I use email to authenticate

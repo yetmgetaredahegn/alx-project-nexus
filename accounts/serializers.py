@@ -36,12 +36,15 @@ class UserCreatePasswordRetypeSerializer(DjoserUserCreatePasswordRetypeSerialize
 
     class Meta(DjoserUserCreatePasswordRetypeSerializer.Meta):
         model = User
-        fields = ("id", "email", "username", "password", "is_seller")
+        # Include re_password which is required by the parent serializer
+        fields = ("id", "email", "username", "password", "re_password", "is_seller")
         read_only_fields = ("id",)
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
         is_seller = validated_data.pop("is_seller", False)
+        # re_password is handled by parent class validation, remove it if present
+        validated_data.pop("re_password", None)
         user = super().create(validated_data)
         user.is_seller = is_seller
         user.save(update_fields=["is_seller"])

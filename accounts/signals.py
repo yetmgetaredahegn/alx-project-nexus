@@ -14,16 +14,21 @@ def create_profile_and_send_notification(sender, instance, created, **kwargs):
     """
     Signal handler to create profile and send welcome notification when a user is created.
     Uses get_or_create for Profile to handle race conditions safely.
-    Wraps notification and email sending in try-except to prevent registration failures.
+    All operations are wrapped in try-except to prevent registration failures.
     """
     if created:
-        # Use get_or_create to handle potential race conditions
-        # This is safe even if the signal is called multiple times
-        profile, profile_created = Profile.objects.get_or_create(user=instance)
-        
-        if not profile_created:
-            logger.warning(
-                f"Profile already exists for user {instance.email}. Skipping profile creation."
+        # Create profile - wrap in try-except to prevent registration failure
+        try:
+            profile, profile_created = Profile.objects.get_or_create(user=instance)
+            if not profile_created:
+                logger.warning(
+                    f"Profile already exists for user {instance.email}. Skipping profile creation."
+                )
+        except Exception as e:
+            # Log the error but don't fail user registration
+            logger.error(
+                f"Failed to create profile for user {instance.email}: {str(e)}",
+                exc_info=True
             )
 
         # Create notification record - wrap in try-except to prevent registration failure

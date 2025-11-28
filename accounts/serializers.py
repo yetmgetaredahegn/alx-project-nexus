@@ -45,10 +45,21 @@ class UserCreatePasswordRetypeSerializer(DjoserUserCreatePasswordRetypeSerialize
         is_seller = validated_data.pop("is_seller", False)
         # re_password is handled by parent class validation, remove it if present
         validated_data.pop("re_password", None)
-        user = super().create(validated_data)
-        user.is_seller = is_seller
-        user.save(update_fields=["is_seller"])
-        return user
+        try:
+            user = super().create(validated_data)
+            user.is_seller = is_seller
+            user.save(update_fields=["is_seller"])
+            return user
+        except Exception as e:
+            # Re-raise the exception but log it for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                f"Failed to create user: {str(e)}",
+                exc_info=True,
+                extra={"email": validated_data.get("email")}
+            )
+            raise
 
 
 class UserSerializer(DjoserUserSerializer):

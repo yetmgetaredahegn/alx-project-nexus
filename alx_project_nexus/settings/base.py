@@ -12,12 +12,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Initialize environment variables
 env = environ.Env(
-    DEBUG=(bool, False)
+    DEBUG=(bool, False),
+    SECRET_KEY=(str, "dummy-secret-key-for-build-time-only-change-in-production")
 )
 
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# Allow default value during Docker build, but require it at runtime
 SECRET_KEY = env("SECRET_KEY")
 
 # Application definition

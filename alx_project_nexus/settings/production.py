@@ -24,35 +24,63 @@ X_FRAME_OPTIONS = 'DENY'
 
 # Database
 # Production should always use DATABASE_URL
+# Allow dummy value during Docker build, validate at runtime
 DATABASE_URL = os.environ.get("DATABASE_URL")
+SECRET_KEY_VALUE = os.environ.get("SECRET_KEY", "")
+
+# Check if we're in a Docker build context (build-time dummy SECRET_KEY)
+IS_BUILD_TIME = SECRET_KEY_VALUE.startswith(("build-time-dummy", "celery-build-dummy"))
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required for production")
-
-DATABASES = {
-    "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-}
+    # During Docker build, use a dummy database config
+    # This allows collectstatic to run without requiring DATABASE_URL
+    if IS_BUILD_TIME:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
+        }
+    else:
+        raise ValueError("DATABASE_URL environment variable is required for production")
+else:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    }
 
 # Cache Configuration - Production should use Redis
+# Allow dummy value during Docker build, validate at runtime
 REDIS_URL = os.environ.get("REDIS_URL")
 
 if not REDIS_URL:
-    raise ValueError("REDIS_URL environment variable is required for production")
+    # During Docker build, use dummy cache
+    if IS_BUILD_TIME:
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            }
+        }
+        CELERY_BROKER_URL = "memory://"
+        CELERY_RESULT_BACKEND = "cache+memory://"
+    else:
+        raise ValueError("REDIS_URL environment variable is required for production")
+else:
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SSLCERTREQS": None,  # Required for Upstash TLS
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SSLCERTREQS": None,  # Required for Upstash TLS
+            }
         }
     }
-}
 
-# Celery Configuration
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
+    # Celery Configuration
+    CELERY_BROKER_URL = REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
+
 CELERY_TASK_ALWAYS_EAGER = False
 
 # Email Backend - Use SMTP for production

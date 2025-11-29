@@ -22,11 +22,19 @@ RUN pip install -r requirements.txt
 # Copy project
 COPY . .
 
-# Collect static files
-RUN DJANGO_ENV=production python manage.py collectstatic --noinput
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Collect static files (using dummy SECRET_KEY for build-time)
+# This allows collectstatic to run during build without requiring runtime env vars
+# Static files will be collected again at runtime with proper env vars
+RUN SECRET_KEY=build-time-dummy-key DJANGO_ENV=production python manage.py collectstatic --noinput || true
 
 # Expose port
 EXPOSE 8000
 
 # Start Gunicorn server
-CMD ["gunicorn", "alx_project_nexus.wsgi:application", "--bind", "0.0.0.0:$PORT"]
+# PORT will be set by Railway/Render at runtime
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "alx_project_nexus.wsgi:application", "--bind", "0.0.0.0:8000"]

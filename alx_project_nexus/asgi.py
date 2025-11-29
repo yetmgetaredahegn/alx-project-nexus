@@ -12,5 +12,7 @@ import os
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alx_project_nexus.settings')
+# Set production environment for ASGI
+os.environ.setdefault('DJANGO_ENV', 'production')
 
 application = get_asgi_application()

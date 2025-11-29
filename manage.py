@@ -7,6 +7,9 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'alx_project_nexus.settings')
+    # Default to development if DJANGO_ENV is not set
+    if 'DJANGO_ENV' not in os.environ:
+        os.environ.setdefault('DJANGO_ENV', 'development')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

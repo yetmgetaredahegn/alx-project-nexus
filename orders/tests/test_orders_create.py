@@ -5,20 +5,33 @@ from django.urls import reverse
 class TestOrderCreate:
     def test_requires_auth(self, api_client):
         url = reverse("orders:order-list")
-        payload = {"shipping_address_id": "uuid", "payment_method": "chapa"}
+        payload = {
+            "shipping_address": {
+                "address_line": "123 Test St",
+                "city": "Test City",
+                "postal_code": "12345",
+                "country": "Test Country"
+            },
+            "payment_method": "chapa"
+        }
 
-        response = api_client.post(url, payload)
+        response = api_client.post(url, payload, format="json")
         assert response.status_code == 401
 
     def test_fails_if_cart_empty(self, authenticated_client):
         url = reverse("orders:order-list")
 
         payload = {
-            "shipping_address_id": "11111111-1111-1111-1111-111111111111",
+            "shipping_address": {
+                "address_line": "123 Test St",
+                "city": "Test City",
+                "postal_code": "12345",
+                "country": "Test Country"
+            },
             "payment_method": "chapa",
         }
 
-        response = authenticated_client.post(url, payload)
+        response = authenticated_client.post(url, payload, format="json")
         assert response.status_code == 400
         assert "cart" in response.data["detail"].lower() or "empty" in response.data["detail"].lower()
 
@@ -28,26 +41,38 @@ class TestOrderCreate:
         url = reverse("orders:order-list")
 
         payload = {
-            "shipping_address_id": "11111111-1111-1111-1111-111111111111",
+            "shipping_address": {
+                "address_line": "123 Test St",
+                "city": "Test City",
+                "postal_code": "12345",
+                "country": "Test Country"
+            },
             "payment_method": "chapa",
         }
 
-        response = authenticated_client.post(url, payload)
+        response = authenticated_client.post(url, payload, format="json")
 
         assert response.status_code == 201
         assert response.data["status"] == "pending"
         assert "id" in response.data
+        assert "shipping_address" in response.data
+        assert response.data["shipping_address"]["address_line"] == "123 Test St"
 
     def test_clears_cart_after_order(
         self, authenticated_client, cart_with_items, cart_model
     ):
         url = reverse("orders:order-list")
         payload = {
-            "shipping_address_id": "11111111-1111-1111-1111-111111111111",
+            "shipping_address": {
+                "address_line": "123 Test St",
+                "city": "Test City",
+                "postal_code": "12345",
+                "country": "Test Country"
+            },
             "payment_method": "chapa",
         }
 
-        authenticated_client.post(url, payload)
+        authenticated_client.post(url, payload, format="json")
 
         cart = cart_model.objects.get(user=cart_with_items.user)
         assert cart.items.count() == 0

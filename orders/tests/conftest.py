@@ -84,7 +84,10 @@ def order_factory(user):
     def create(**kwargs):
         default = {
             "user": user,
-            "shipping_address_id": "11111111-1111-1111-1111-111111111111",
+            "shipping_address_line": "123 Test St",
+            "shipping_city": "Test City",
+            "shipping_postal_code": "12345",
+            "shipping_country": "Test Country",
             "payment_method": "chapa",
             "payment_status": Order.PAYMENT_PENDING,
             "status": Order.STATUS_PENDING,

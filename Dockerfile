@@ -23,7 +23,7 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Collect static files
-RUN python manage.py collectstatic --noinput
+RUN DJANGO_ENV=production python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000

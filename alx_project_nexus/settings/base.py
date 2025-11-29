@@ -179,12 +179,12 @@ CHAPA_BASE_URL = os.getenv("CHAPA_BASE_URL", "https://api.chapa.co/v1")
 # Payment Callback URLs
 PAYMENT_CALLBACK_URL = os.getenv(
     "PAYMENT_CALLBACK_URL", 
-    "https://yourdomain.com/api/payments/webhook/"
+    "https://alx-project-nexus-el5s.onrender.com/api/payments/webhook/"
 )
 
 PAYMENT_RETURN_URL = os.getenv(
     "PAYMENT_RETURN_URL",
-    "https://yourdomain.com/payment-success/"
+    "https://alx-project-nexus-el5s.onrender.com/payment-success/"
 )
 
 # Email Configuration (base - will be overridden in environment-specific settings)

@@ -27,7 +27,8 @@ from .tasks import send_payment_confirmation_email
     summary="Initiate a payment for an order",
     description=(
         "Initializes a Chapa payment for the user's order. "
-        "Creates a Payment record and returns a redirect URL."
+        "Creates a Payment record and returns a redirect URL.\n\n"
+        "**User-friendly**: Accepts order_id as integer (order ID from order creation response)."
     ),
     tags=["Payments"],
     request=OpenApiTypes.OBJECT,
@@ -35,8 +36,8 @@ from .tasks import send_payment_confirmation_email
         OpenApiExample(
             name="Payment initiation",
             value={
-                "order_id": "uuid-of-order",
-                "return_url": "https://example.com/thank-you"
+                "order_id": 123,  # Integer order ID (user-friendly)
+                "return_url": "https://example.com/thank-you"  # Optional
             }
         )
     ],
@@ -55,10 +56,19 @@ def initiate_payment(request):
     if not order_id:
         return Response({"detail": "order_id is required"}, status=400)
 
+    # Accept both integer and string UUID for backward compatibility
     try:
-        order = Order.objects.get(id=order_id, user=request.user)
-    except Order.DoesNotExist:
-        return Response({"detail": "Order not found"}, status=404)
+        # Try as integer first (user-friendly)
+        if isinstance(order_id, str) and order_id.isdigit():
+            order_id = int(order_id)
+        
+        if isinstance(order_id, int):
+            order = Order.objects.get(pk=order_id, user=request.user)
+        else:
+            # Try as UUID string (backward compatibility)
+            order = Order.objects.get(id=order_id, user=request.user)
+    except (Order.DoesNotExist, ValueError, TypeError):
+        return Response({"detail": "Order not found or invalid order_id"}, status=404)
 
     # Check if payment already exists
     if hasattr(order, "payment"):

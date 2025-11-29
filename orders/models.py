@@ -31,7 +31,16 @@ class Order(models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_PENDING)
     payment_status = models.CharField(max_length=32, choices=PAYMENT_STATUS_CHOICES, default=PAYMENT_PENDING)
     payment_method = models.CharField(max_length=64, blank=True, null=True)  # snapshot of chosen method (e.g. 'chapa')
+    
+    # Shipping address fields (user-friendly direct input)
+    shipping_address_line = models.CharField(max_length=255, blank=True, null=True)
+    shipping_city = models.CharField(max_length=100, blank=True, null=True)
+    shipping_postal_code = models.CharField(max_length=20, blank=True, null=True)
+    shipping_country = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Legacy field - kept for backward compatibility but optional now
     shipping_address_id = models.UUIDField(blank=True, null=True)  # snapshot reference to address service
+    
     total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

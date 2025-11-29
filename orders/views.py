@@ -52,7 +52,12 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Create order from current user's cart",
-        description="Creates an order from the authenticated user's cart. Validates stock availability, creates order items, decrements product stock, and clears the cart. Returns the created order with payment status 'pending'.",
+        description=(
+            "Creates an order from the authenticated user's cart. Validates stock availability, creates order items, "
+            "decrements product stock, and clears the cart. Returns the created order with payment status 'pending'.\n\n"
+            "**User-friendly shipping address**: Provide shipping address as an object with 'address_line', 'city', "
+            "'postal_code', and 'country' fields instead of a UUID."
+        ),
         request=OrderCreateSerializer,
         responses={201: OrderSerializer, 400: "Bad request (empty cart, insufficient stock, inactive product)", 401: "Unauthorized"},
         tags=["Orders"],
@@ -60,7 +65,10 @@ class OrderViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        shipping_address_id = serializer.validated_data.get("shipping_address_id")
+        
+        # Get shipping address data (user-friendly object)
+        shipping_address_data = serializer.validated_data.get("shipping_address")
+        shipping_address_id = serializer.validated_data.get("shipping_address_id")  # Legacy support
         payment_method = serializer.validated_data["payment_method"]
 
         # get cart
@@ -82,14 +90,33 @@ class OrderViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
+            # Prepare order creation data
+            order_data = {
+                "user": request.user,
+                "payment_method": payment_method,
+                "payment_status": Order.PAYMENT_PENDING,
+                "total": Decimal("0.00"),
+            }
+            
+            # Add shipping address (prefer new user-friendly fields)
+            if shipping_address_data:
+                order_data.update({
+                    "shipping_address_line": shipping_address_data["address_line"],
+                    "shipping_city": shipping_address_data["city"],
+                    "shipping_postal_code": shipping_address_data["postal_code"],
+                    "shipping_country": shipping_address_data["country"],
+                })
+            elif shipping_address_id:
+                # Legacy support - if only shipping_address_id is provided
+                order_data["shipping_address_id"] = shipping_address_id
+            else:
+                return Response(
+                    {"detail": "Either 'shipping_address' object or 'shipping_address_id' is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             # create order
-            order = Order.objects.create(
-                user=request.user,
-                payment_method=payment_method,
-                payment_status=Order.PAYMENT_PENDING,
-                shipping_address_id=shipping_address_id,
-                total=Decimal("0.00"),
-            )
+            order = Order.objects.create(**order_data)
 
             total = Decimal("0.00")
             # create items and adjust product stock

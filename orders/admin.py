@@ -24,7 +24,6 @@ class OrderAdmin(admin.ModelAdmin):
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = ["id", "order", "product_title", "quantity", "unit_price", "line_total"]
-    list_filter = ["created_at"]
     search_fields = ["order__user__email", "product_title"]
     readonly_fields = ["id", "order", "product_id", "product_title", "unit_price", "quantity", "line_total"]
     fields = ["id", "order", "product_id", "product_title", "unit_price", "quantity", "line_total"]

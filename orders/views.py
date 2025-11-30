@@ -56,10 +56,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             "Creates an order from the authenticated user's cart. Validates stock availability, creates order items, "
             "decrements product stock, and clears the cart. Returns the created order with payment status 'pending'.\n\n"
             "**User-friendly shipping address**: Provide shipping address as an object with 'address_line', 'city', "
-            "'postal_code', and 'country' fields instead of a UUID."
+            "'postal_code', and 'country' fields."
         ),
         request=OrderCreateSerializer,
-        responses={201: OrderSerializer, 400: "Bad request (empty cart, insufficient stock, inactive product)", 401: "Unauthorized"},
+        responses={
+            201: OrderSerializer,
+            400: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+        },
         tags=["Orders"],
     )
     def create(self, request, *args, **kwargs):
@@ -68,8 +72,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         # Get shipping address data (user-friendly object)
         shipping_address_data = serializer.validated_data.get("shipping_address")
-        shipping_address_id = serializer.validated_data.get("shipping_address_id")  # Legacy support
         payment_method = serializer.validated_data["payment_method"]
+
+        # Validate shipping address is provided
+        if not shipping_address_data:
+            return Response(
+                {"shipping_address": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # get cart
         cart, _ = Cart.objects.get_or_create(user=request.user)
@@ -90,30 +100,17 @@ class OrderViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            # Prepare order creation data
+            # Prepare order creation data with shipping address
             order_data = {
                 "user": request.user,
                 "payment_method": payment_method,
                 "payment_status": Order.PAYMENT_PENDING,
                 "total": Decimal("0.00"),
+                "shipping_address_line": shipping_address_data["address_line"],
+                "shipping_city": shipping_address_data["city"],
+                "shipping_postal_code": shipping_address_data["postal_code"],
+                "shipping_country": shipping_address_data["country"],
             }
-            
-            # Add shipping address (prefer new user-friendly fields)
-            if shipping_address_data:
-                order_data.update({
-                    "shipping_address_line": shipping_address_data["address_line"],
-                    "shipping_city": shipping_address_data["city"],
-                    "shipping_postal_code": shipping_address_data["postal_code"],
-                    "shipping_country": shipping_address_data["country"],
-                })
-            elif shipping_address_id:
-                # Legacy support - if only shipping_address_id is provided
-                order_data["shipping_address_id"] = shipping_address_id
-            else:
-                return Response(
-                    {"detail": "Either 'shipping_address' object or 'shipping_address_id' is required."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
             # create order
             order = Order.objects.create(**order_data)
@@ -159,7 +156,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         summary="Update order status (admin only)",
         description="Update the status of an order. Only admin users can update order status. Status changes may trigger notifications.",
         request=OrderStatusUpdateSerializer,
-        responses={200: OrderSerializer, 400: "Bad request", 403: "Forbidden (admin only)", 404: "Not found"},
+        responses={
+            200: OrderSerializer,
+            400: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+        },
         tags=["Orders"],
     )
     def partial_update(self, request, *args, **kwargs):
@@ -175,7 +177,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         summary="Request order cancellation",
         description="Request cancellation of an order. Only the order owner or admin can request cancellation. Returns a cancellation request record.",
         request=OrderCancellationSerializer,
-        responses={200: OrderCancellationSerializer, 400: "Bad request", 403: "Forbidden", 404: "Not found"},
+        responses={
+            200: OrderCancellationSerializer,
+            400: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+        },
         tags=["Orders"],
     )
     @action(detail=True, methods=["post"], url_path="cancel")

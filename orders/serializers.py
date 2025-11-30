@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Optional
 from rest_framework import serializers
 from .models import Order, OrderItem, OrderCancellationRequest
 
@@ -30,7 +31,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "payment_method",
             "shipping_address",
-            "shipping_address_id",  # Keep for backward compatibility
             "total",
             "items",
             "created_at",
@@ -38,7 +38,7 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user", "status", "payment_status", "total", "items", "created_at", "updated_at"]
 
-    def get_shipping_address(self, obj):
+    def get_shipping_address(self, obj) -> Optional[dict]:
         """Return shipping address as a user-friendly object"""
         if obj.shipping_address_line:
             return {
@@ -54,9 +54,25 @@ class OrderCreateSerializer(serializers.Serializer):
     """User-friendly order creation - accepts shipping address as object"""
     shipping_address = ShippingAddressSerializer(required=True)
     payment_method = serializers.CharField(max_length=64, required=True)
-    
-    # Legacy field - kept for backward compatibility but deprecated
-    shipping_address_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def to_internal_value(self, data):
+        """
+        Handle shipping_address when sent as JSON string in multipart/form-data.
+        This allows the API to work with both JSON and form-data requests.
+        """
+        # If shipping_address is a string (JSON), parse it
+        if isinstance(data.get("shipping_address"), str):
+            import json
+            try:
+                parsed = json.loads(data["shipping_address"])
+                # Handle both single object and list format
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    parsed = parsed[0]
+                data["shipping_address"] = parsed
+            except (json.JSONDecodeError, TypeError, KeyError):
+                pass  # Let the serializer handle the error
+        
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
         # Validate payment method
@@ -66,11 +82,6 @@ class OrderCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"Invalid payment method. Must be one of: {', '.join(valid_methods)}"
             )
-        
-        # If both shipping_address and shipping_address_id are provided, prefer shipping_address
-        if attrs.get("shipping_address") and attrs.get("shipping_address_id"):
-            # Remove shipping_address_id if shipping_address is provided
-            attrs.pop("shipping_address_id", None)
         
         return attrs
 

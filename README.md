@@ -1,129 +1,218 @@
----
+# 🛍️ **ALX Project Nexus – Modular E-Commerce Backend**
 
-
-# 🛍️ ALX Project Nexus -  E-Commerce Backend
-
-A **modular monolithic Django backend** built with clean architecture, high cohesion, and low coupling — providing a scalable foundation for real-world e-commerce systems.
-
-This project follows **ALX Backend Engineering** best practices for production-grade API design, DevOps integration, and automated testing.
+*A production-ready, scalable backend built using Django, DRF, Celery, Redis, PostgreSQL, and clean architecture.*
 
 ---
 
-## 🚀 Overview
+## 🚀 **Project Overview**
 
-**ALX Project Nexus** is a backend platform for managing users, products, carts, orders, and payments, designed with maintainability and extensibility in mind.  
-It demonstrates **modular monolithic architecture**, where each domain (accounts, catalog, orders, payments, notifications, etc.) lives in its own Django app with clearly defined boundaries.
+**ALX Project Nexus** is a modular monolithic **E-Commerce Backend Platform** designed for real-world scalability, clean domain separation, and production-ready deployment.
 
-Key Features:
-- RESTful APIs built with **Django REST Framework**
-- **GraphQL** endpoint for rich product browsing
-- **JWT Authentication** with Djoser
-- **Celery + RabbitMQ** for background tasks (emails, async notifications)
-- **Redis** caching for performance optimization
-- **PostgreSQL** database with clean schema
-- **Pytest** for automated testing
-- **Docker** containerization
-- **GitHub Actions CI/CD**
-- API documentation with **Swagger / OpenAPI**
+It implements:
+
+* **REST APIs** using Django REST Framework
+* **JWT Authentication** with Djoser + SimpleJWT
+* **Celery background tasks** (emails, notifications)
+* **Redis as broker/backing** (production-ready for Railway)
+* **PostgreSQL database** using Neon
+* **Modular architecture** (each domain isolated)
+* **Render deployment** for API
+* **Railway deployment** for Celery worker
+* **Automated testing** with Pytest
+* **Docker-based local dev environment**
+
+This backend demonstrates real engineering concepts: async workflows, caching, modular boundaries, and cloud deployment.
 
 ---
 
-## 🧱 Architecture
+## 🧱 **Architecture Summary**
 
-**Type:** Modular Monolith  
-**Principles:** High Cohesion, Low Coupling  
-**Structure:**
+### **Architecture Type:**
+
+🔹 *Modular Monolith*: each business domain is its own Django app
+
+🔹 *High Cohesion + Low Coupling*
+
+🔹 *Shared Core Layer* for common utilities
 
 ```
-
 alx_project_nexus/
-├── core/                          # Common utilities, base models, shared mixins
-├── accounts/                      # Auth, profiles (Djoser + JWT)
-├── catalog/                       # Categories, products, reviews, carts
-├── orders/                        # Orders and order items
-├── payments/                      # Payment handling, Chapa/Stripe gateway integration
-├── notifications/                 # Email + in-app notifications (Celery workers)
-├── graphql_api/                   # GraphQL schema for product browsing
-└── alx_project_nexus/           # Project settings, URLs, ASGI/Wsgi, Celery config
-
-````
-
-- Each module manages its own models, serializers, services, and tests.
-- Shared logic (e.g., BaseModel, timestamp mixins, signals) lives in `core/`.
+│
+├── core/               # Common utilities, base models, mixins
+├── accounts/           # Authentication, profiles, JWT via Djoser
+├── catalog/            # Categories, products, reviews
+├── cart/               # Shopping cart management
+├── orders/             # Orders, order items, order status updates
+├── payments/           # Payment verification (e.g., Chapa integration)
+├── notifications/      # Email + async notification tasks (Celery)
+└── alx_project_nexus/  # Settings, URLs, Celery config
+```
 
 ---
 
-## ⚙️ Tech Stack
+## ⚙️ **Tech Stack**
 
-| Layer | Technology |
-|-------|-------------|
-| **Framework** | Django 5 + Django REST Framework |
-| **GraphQL** | Graphene-Django / Ariadne |
-| **Database** | PostgreSQL |
-| **Cache** | Redis |
-| **Message Broker** | RabbitMQ |
-| **Task Queue** | Celery |
-| **Auth** | JWT (SimpleJWT + Djoser) |
-| **Tests** | Pytest + DRF Test Client |
-| **Docs** | Swagger (drf-spectacular) |
-| **CI/CD** | GitHub Actions |
-| **Containerization** | Docker + Docker Compose |
-
----
-
-## 🧩 Modular Apps and Responsibilities
-
-| App | Responsibility |
-|-----|----------------|
-| **core** | Shared base models, utilities, health checks |
-| **accounts** | User registration, authentication, profiles |
-| **catalog** | Product, category, review, and cart management |
-| **orders** | Order creation, tracking, and management |
-| **payments** | Payment gateway integration (Chapa, Stripe) |
-| **notifications** | Email + in-app notifications (Celery) |
-| **graphql_api** | Product search and browsing via GraphQL |
+| Layer                 | Technology                             |
+| --------------------- | -------------------------------------- |
+| **Backend Framework** | Django 5                               |
+| **API Layer**         | Django REST Framework                  |
+| **Database**          | PostgreSQL (Neon)                      |
+| **Cache / Broker**    | Redis                                  |
+| **Task Queue**        | Celery 5                               |
+| **Auth**              | JWT (SimpleJWT) + Djoser               |
+| **Testing**           | Pytest                                 |
+| **CI/CD**             | GitHub Actions                         |
+| **Deployment**        | Render (API) + Railway (Celery Worker) |
+| **Containerization**  | Docker + Docker Compose                |
 
 ---
 
-## 🗺️ API Documentation
+## 🔌 **REST API Endpoints Overview**
 
-- **Swagger UI:** [`/api/docs/`](http://localhost:8000/api/docs/)
-- **OpenAPI Schema:** `/api/schema/`
-- **GraphQL Playground:** `/graphql/`
+### **Authentication (JWT – via Djoser)**
 
-### Authentication
-JWT Authentication (via Djoser)
-```bash
+```
 POST /api/auth/jwt/create/
 POST /api/auth/jwt/refresh/
 GET /api/auth/users/me/
-````
+```
+
+### **Catalog**
+
+```
+GET /api/catalog/categories/
+POST /api/catalog/categories/
+GET /api/catalog/products/
+POST /api/catalog/products/
+GET /api/catalog/products/{id}/reviews/
+POST /api/catalog/products/{id}/reviews/
+```
+
+### **Cart**
+
+```
+GET /api/cart/cart/
+POST /api/cart/cart/items/
+PATCH /api/cart/cart/items/<id>/
+DELETE /api/cart/cart/items/<id>/
+DELETE /api/cart/cart/clear/
+```
+
+### **Orders**
+
+```
+POST /api/orders/
+GET /api/orders/
+GET /api/orders/<id>/
+```
+
+### **Payments**
+
+```
+POST /api/payments/initiate/
+POST /api/payments/webhook/
+GET /api/payments/
+GET /api/payments/<id>/
+```
+
+### **Notifications**
+
+Triggered by events (asynchronous via Celery worker)
+
+### **API Documentation**
+
+- **Swagger UI:** [`/api/docs/`](http://localhost:8000/api/docs/)
+- **OpenAPI Schema:** `/api/schema/`
+- **ReDoc:** `/api/redoc/`
 
 ---
 
-## 📦 Installation & Setup
+## 🔄 **Background Tasks (Celery)**
 
-### 1. Clone Repository
+| Task                     | Trigger          | Worker        |
+| ------------------------ | ---------------- | ------------- |
+| Welcome email            | User registers   | Celery Worker |
+| Order confirmation email | Order placed     | Celery Worker |
+| Payment confirmation     | Payment verified | Celery Worker |
+| Notification dispatch    | Various events   | Celery Worker |
+
+### **Celery Config (Production – Railway Worker)**
+
+```python
+CELERY_BROKER_URL = os.getenv("REDIS_URL")
+CELERY_RESULT_BACKEND = os.getenv("REDIS_URL")
+```
+
+### **Deployment Setup**
+
+* Render runs **Django API**
+* Railway runs **Celery Worker**
+* Both share:
+  * Same Neon PostgreSQL DB
+  * Same Redis URL
+
+This enables **true asynchronous background tasks** in production.
+
+---
+
+## 🧱 **Data Model (ERD Summary)**
+
+### **Accounts**
+
+* User
+* Profile
+
+### **Catalog**
+
+* Category
+* Product
+* Review
+
+### **Cart**
+
+* Cart
+* CartItem
+
+### **Orders**
+
+* Order
+* OrderItem
+* OrderCancellationRequest
+
+### **Payments**
+
+* Payment
+* TransactionLog
+
+### **Notifications**
+
+* Notification
+* EmailNotificationTask
+
+---
+
+## 🏗️ **Installation & Setup**
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/yetmgetaredahegn/alx-project-nexus.git
 cd alx-project-nexus
 ```
 
-### 2. Environment Variables
-
-Create `.env` file in the root:
+### 2. Create `.env`
 
 ```env
 DEBUG=True
 SECRET_KEY=your-secret-key
-DATABASE_URL=postgres://postgres:password@db:5432/nexus
-REDIS_URL=redis://redis:6379/0
-CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
-ALLOWED_HOSTS=localhost,127.0.0.1
+DATABASE_URL=<postgres url>
+REDIS_URL=<redis url>
+CELERY_BROKER_URL=${REDIS_URL}
+CELERY_RESULT_BACKEND=${REDIS_URL}
+ALLOWED_HOSTS=*
 ```
 
-### 3. Build and Run with Docker
+### 3. Run with Docker
 
 ```bash
 docker-compose up --build
@@ -133,11 +222,11 @@ Services included:
 
 * `web` → Django app
 * `db` → PostgreSQL
-* `redis` → caching
-* `rabbitmq` → message broker
+* `redis` → caching and Celery broker
 * `celery_worker` → background task processor
+* `celery_beat` → periodic task scheduler
 
-### 4. Apply Migrations
+### 4. Migrate
 
 ```bash
 docker exec -it web python manage.py migrate
@@ -157,11 +246,71 @@ pytest
 
 ---
 
-## 🧠 Key Features by Domain
+## 🧪 **Testing Strategy**
+
+* **Unit Tests**
+  * models
+  * serializers
+  * utils
+
+* **Integration Tests**
+  * auth flow
+  * product listing
+  * order creation
+
+* **End-to-End Tests**
+  * cart → order flow
+  * payment → webhook → confirmation email
+
+* **CI/CD**
+  * automated tests
+  * docker build
+  * quality checks
+
+---
+
+## ☁️ **Deployment Summary (Production)**
+
+### **Render**
+
+* Django REST API
+* Gunicorn server
+* Auto-deploy on push
+
+### **Railway (Worker)**
+
+* Celery worker consuming Redis queues
+* Handles notifications, payments, emails
+
+### **Neon PostgreSQL**
+
+* Shared database for both services
+
+### **Redis**
+
+* Shared broker for Celery + cache backend
+
+---
+
+## 🧩 **Modular Apps and Responsibilities**
+
+| App | Responsibility |
+|-----|----------------|
+| **core** | Shared base models, utilities, health checks |
+| **accounts** | User registration, authentication, profiles |
+| **catalog** | Product, category, review management |
+| **cart** | Shopping cart and cart items |
+| **orders** | Order creation, tracking, and management |
+| **payments** | Payment gateway integration (Chapa) |
+| **notifications** | Email + in-app notifications (Celery) |
+
+---
+
+## 🧠 **Key Features by Domain**
 
 ### Accounts
 
-* User registration with email verification (Celery + RabbitMQ)
+* User registration with email verification (Celery)
 * JWT-based login/logout
 * Profile management
 
@@ -174,7 +323,7 @@ pytest
 
 ### Cart
 
-* Session or user-based cart
+* User-based cart
 * Item quantity updates and merging
 * Live stock validation
 
@@ -194,38 +343,10 @@ pytest
 
 * Celery background emails
 * Read/unread tracking
-* Optional WebSocket real-time updates
 
 ---
 
-## 🔄 Background Tasks
-
-| Task                         | Trigger           | Worker Queue |
-| ---------------------------- | ----------------- | ------------ |
-| Send welcome email           | User registration | `emails`     |
-| Order confirmation           | Order placed      | `emails`     |
-| Payment success notification | Webhook verified  | `emails`     |
-| Cache invalidation           | Product updated   | `default`    |
-
-**Celery Config:**
-
-```python
-CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
-CELERY_RESULT_BACKEND = "redis://redis:6379/0"
-```
-
----
-
-## 🧪 Testing Strategy
-
-* **Unit Tests:** models, serializers, utils (pytest)
-* **Integration Tests:** API endpoints via DRF `APIClient`
-* **E2E:** simulate checkout flow (cart → order → payment)
-* **CI:** automated in GitHub Actions (run tests + lint + build Docker image)
-
----
-
-## 🧰 Developer Notes
+## 🧰 **Developer Notes**
 
 ### Modular Monolith Guidelines
 
@@ -239,24 +360,27 @@ CELERY_RESULT_BACKEND = "redis://redis:6379/0"
 ```bash
 python manage.py runserver
 python manage.py shell
-celery -A config worker -l info
-celery -A config beat -l info
+celery -A alx_project_nexus worker -l info
+celery -A alx_project_nexus beat -l info
 ```
 
 ---
 
-## 🧭 Project Roadmap
+## 🧭 **Roadmap**
 
-1. ✅ Define ERD and modular boundaries
-2. ✅ Define API endpoints (REST + GraphQL)
-3. 🚧 Implement models & serializers per app
-4. 🚧 Add Celery + Redis integration
-5. 🚧 Implement tests (pytest)
-6. 🚧 Deploy with Docker + GitHub Actions
+* [x] Modular architecture
+* [x] REST APIs
+* [x] Notifications (Celery)
+* [x] Basic payments
+* [x] Render + Railway deployment
+* [ ] WebSockets for live order status
+* [ ] Admin dashboard
+* [ ] Advanced analytics
+* [ ] AI-powered recommendations
 
 ---
 
-## 🤝 Contributing
+## 🤝 **Contributing**
 
 1. Fork the repo
 2. Create your feature branch
@@ -273,13 +397,24 @@ celery -A config beat -l info
 
 ---
 
-## 🧑‍💻 Author
+## 👨‍💻 **Author**
 
 **Yetmgeta Redahegn Kassaye**
-Software Engineering Student @ Adama Science and Technology University
-Focused on  Backend Engineering
+
+Backend Engineering Student @ ASTU
+
+ALX Backend Engineering Program
 
 > *"Building scalable systems, one module at a time."*
 
 ---
 
+## ✔ **Your README is now:**
+
+* 🔥 More accurate
+* 🧼 Clean and professional
+* 🧩 GraphQL removed entirely
+* 🧠 Focused on real system features
+* 🚀 Aligned with your actual Render + Railway deployment
+* 🧪 Reflects Celery + Redis + Neon setup
+* 📦 Suitable for ALX mentor review

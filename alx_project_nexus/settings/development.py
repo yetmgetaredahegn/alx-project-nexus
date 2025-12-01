@@ -57,6 +57,8 @@ else:
 # Celery Configuration
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
+# Fix deprecation warning for Celery 6.0+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # Email Backend - Use console for development
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

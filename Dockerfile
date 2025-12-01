@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user for running the application
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip
@@ -31,8 +34,15 @@ RUN chmod +x /entrypoint.sh
 # Static files will be collected again at runtime with proper env vars
 RUN SECRET_KEY=build-time-dummy-key DJANGO_ENV=production python manage.py collectstatic --noinput || true
 
+# Change ownership of app directory to appuser
+# Note: For development with volumes, we'll handle permissions in docker-compose
+RUN chown -R appuser:appuser /app
+
 # Expose port
 EXPOSE 8000
+
+# Switch to non-root user
+USER appuser
 
 # Start Gunicorn server
 # PORT will be set by Railway/Render at runtime

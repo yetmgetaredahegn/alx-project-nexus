@@ -1,6 +1,7 @@
 # accounts/signals.py
 import logging
 from django.db.models.signals import post_save
+from django.db import transaction
 from django.dispatch import receiver
 from .models import User, Profile
 from notifications.models import Notification
@@ -15,6 +16,7 @@ def create_profile_and_send_notification(sender, instance, created, **kwargs):
     Signal handler to create profile and send welcome notification when a user is created.
     Uses get_or_create for Profile to handle race conditions safely.
     All operations are wrapped in try-except to prevent registration failures.
+    Uses transaction.on_commit to ensure notification is committed before queuing task.
     """
     if created:
         # Create profile - wrap in try-except to prevent registration failure
@@ -47,14 +49,18 @@ def create_profile_and_send_notification(sender, instance, created, **kwargs):
                 exc_info=True
             )
 
-        # Trigger Celery task - wrap in try-except to prevent registration failure
-        # if Celery broker is unavailable
+        # Trigger Celery task after transaction commits to avoid race conditions
+        # This ensures the notification exists in the database before the task runs
         if note:
-            try:
-                send_email_notification.delay(str(note.id))
-            except Exception as e:
-                # Log the error but don't fail user registration
-                logger.error(
-                    f"Failed to queue email notification for user {instance.email}: {str(e)}",
-                    exc_info=True
-                )
+            def queue_notification_task():
+                try:
+                    send_email_notification.delay(str(note.id))
+                except Exception as e:
+                    # Log the error but don't fail user registration
+                    logger.error(
+                        f"Failed to queue email notification for user {instance.email}: {str(e)}",
+                        exc_info=True
+                    )
+            
+            # Use on_commit to ensure notification is committed before task is queued
+            transaction.on_commit(queue_notification_task)

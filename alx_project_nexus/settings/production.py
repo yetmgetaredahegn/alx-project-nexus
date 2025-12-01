@@ -80,6 +80,8 @@ else:
     # Celery Configuration
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
+    # Fix deprecation warning for Celery 6.0+
+    CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_TASK_ALWAYS_EAGER = False
 

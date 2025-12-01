@@ -70,6 +70,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: alx_nexus_celery_worker
+    # Use non-root user for Celery worker (security best practice)
+    # Note: For development with volumes, you may need to adjust file permissions
+    user: appuser
     command: celery -A alx_project_nexus worker --loglevel=info --pool=prefork --concurrency=4
     volumes:
       - .:/app
@@ -97,6 +100,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: alx_nexus_celery_beat
+    # Use non-root user for Celery beat (security best practice)
+    # Note: For development with volumes, you may need to adjust file permissions
+    user: appuser
     command: celery -A alx_project_nexus beat --loglevel=info
     volumes:
       - .:/app
